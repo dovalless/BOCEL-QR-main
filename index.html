@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOCEL - Control de Producción</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@700&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #000; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; margin: 0; }
+            @page { size: landscape; margin: 0; }
+            #printable-area { display: flex !important; justify-content: center; align-items: center; height: 100vh; }
+            #report-printable { display: block !important; width: 100%; padding: 20px; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: #000 !important; border-color: #000 !important; }
+        }
+        
+        .print-only { display: none; }
+        
+        /* DISEÑO INDUSTRIAL TICKET */
+        .ticket-bocel {
+            width: 900px;
+            height: 440px;
+            background: white;
+            border: 3px solid #000;
+            display: flex;
+            flex-direction: column;
+            padding: 30px 45px;
+            color: #000;
+            position: relative;
+            box-sizing: border-box;
+            text-rendering: optimizeLegibility;
+        }
+
+        .header-grid {
+            display: grid;
+            grid-template-columns: 140px 1fr 200px;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .header-center {
+            padding-left: 25px;
+            border-left: 2px solid #000;
+            margin-left: 20px;
+            height: 65px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .header-center h2 { font-weight: 950; font-size: 18px; text-transform: uppercase; letter-spacing: 0.05em; color: #000; }
+        .header-center p { font-size: 10px; font-weight: 900; text-transform: uppercase; color: #000; margin-top: 2px; }
+
+        .header-right { text-align: right; }
+        .header-right span { font-size: 11px; font-weight: 900; color: #000; text-transform: uppercase; }
+        .header-right p { font-size: 65px; font-weight: 950; line-height: 0.8; color: #000; margin-bottom: 10px; }
+
+        .info-bar {
+            border-top: 3px solid #000;
+            border-bottom: 3px solid #000;
+            padding: 10px 0;
+            margin: 12px 0;
+            display: flex;
+            justify-content: space-between;
+            font-weight: 950;
+            font-size: 16px;
+            text-transform: uppercase;
+            color: #000;
+        }
+
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 240px 180px;
+            flex: 1;
+            margin-top: 5px;
+        }
+
+        .col-left { display: flex; flex-direction: column; justify-content: space-between; padding-bottom: 10px; }
+        .tandas-section p { font-size: 11px; font-weight: 950; color: #000; text-transform: uppercase; margin-bottom: 12px; }
+        .tandas-flex { display: flex; gap: 35px; }
+        .tanda-item { display: flex; flex-direction: column; }
+        .tanda-item span:first-child { font-size: 11px; font-weight: 950; color: #000; text-transform: uppercase; }
+        .tanda-item span:last-child { font-size: 28px; font-weight: 950; font-style: italic; color: #000; }
+
+        .category-text { font-size: 34px; font-weight: 950; text-transform: uppercase; font-style: italic; margin-top: 15px; color: #000; }
+
+        .col-center {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end; 
+            align-items: flex-end;
+            text-align: right;
+            padding-right: 15px;
+            padding-bottom: 25px; 
+        }
+
+        .total-label { font-size: 12px; font-weight: 950; color: #000; text-transform: uppercase; margin-bottom: 2px; letter-spacing: 0.05em; }
+        .total-container { display: flex; flex-direction: column; align-items: flex-end; }
+        .total-val { font-size: 55px; font-weight: 950; font-style: italic; line-height: 1; letter-spacing: -0.02em; color: #000; }
+        .total-unit { font-size: 24px; font-weight: 950; font-style: italic; line-height: 1; margin-top: 2px; color: #000; }
+
+        .col-right {
+            border-left: 2px dashed #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding-left: 15px;
+        }
+
+        #qrcode { background: white; padding: 5px; border: 1px solid #eee; }
+        .qr-label { font-size: 11px; font-weight: 950; text-transform: uppercase; text-align: center; margin-top: 10px; line-height: 1.1; letter-spacing: 0.05em; color: #000; }
+
+        .footer-line {
+            border-top: 2px solid #000;
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            font-weight: 950;
+            text-transform: uppercase;
+            color: #000;
+        }
+
+        #mobile-view {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #0f172a;
+            z-index: 9999;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .report-modal {
+            max-width: 1200px;
+            width: 95%;
+            max-height: 90vh;
+            background: white;
+            border-radius: 2rem;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Notificación de carga/error */
+        #status-bar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #333;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: bold;
+            display: none;
+            z-index: 10000;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #status-bar.error { background: #ef4444; }
+        #status-bar.success { background: #10b981; }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA DE ESTADO/NOTIFICACIÓN -->
+    <div id="status-bar">Cargando...</div>
+
+    <!-- VISTA ESCANEO MÓVIL -->
+    <div id="mobile-view" class="flex flex-col items-center">
+        <div class="w-full max-w-md bg-slate-900 rounded-[3rem] text-white shadow-2xl overflow-hidden mt-4 border border-slate-800">
+            <div class="p-10 text-center border-b border-slate-800">
+                <div class="flex justify-center mb-6">
+                    <img src="IMG_4612.PNG" alt="Logo BOCEL" class="h-32 w-auto object-contain" onerror="this.src='https://placehold.co/120x120?text=BOCEL'">
+                </div>
+                <div class="bg-indigo-600/20 text-indigo-400 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest inline-block mb-4">
+                    Registro #<span id="m-id">000</span>
+                </div>
+                <p id="m-datetime" class="text-[10px] opacity-40 font-mono">--</p>
+            </div>
+            
+            <div class="p-8 space-y-8">
+                <div>
+                    <p class="text-[10px] font-bold text-slate-500 uppercase mb-2 tracking-widest">Material</p>
+                    <p id="m-material" class="text-3xl font-black italic text-white uppercase">--</p>
+                    <p id="m-linea-view" class="text-xs font-bold text-indigo-500 mt-2 uppercase">LÍNEA: --</p>
+                </div>
+                <div class="bg-slate-800/40 p-6 rounded-3xl border border-slate-700/50">
+                    <div id="m-tandas-list" class="space-y-4"></div>
+                </div>
+                <div class="text-center py-8 bg-white/5 rounded-[2rem]">
+                    <p class="text-[10px] font-bold text-indigo-400 uppercase mb-1">Total Paletizado</p>
+                    <p id="m-total" class="text-6xl font-black text-white italic tracking-tighter">0.00 KG</p>
+                </div>
+            </div>
+            <div class="px-8 pb-10">
+                <button onclick="window.clearScanView()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all">
+                    Finalizar Consulta
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANEL PRINCIPAL -->
+    <div id="main-content" class="max-w-[1400px] mx-auto py-8 px-6 no-print">
+        <header class="flex flex-col md:flex-row justify-between items-center mb-10 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200">
+            <div class="flex items-center gap-8">
+                <img src="IMG_4612.PNG" alt="BOCEL" class="h-24 w-auto object-contain" onerror="this.src='https://placehold.co/100x100?text=BOCEL'">
+                <div class="h-14 w-px bg-slate-200 hidden md:block"></div>
+                <div>
+                    <h1 class="text-2xl font-black text-slate-800 leading-none uppercase italic tracking-tighter">Control de Producción</h1>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em] mt-2">Planta Industrial BOCEL</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-6 mt-6 md:mt-0">
+                <button onclick="window.openReportModal()" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-lg shadow-indigo-200 hover:bg-black transition-all">
+                    Ver todas reportadas
+                </button>
+                <div class="text-right">
+                    <p class="text-[11px] font-black text-indigo-600 uppercase mb-1 tracking-widest">Correlativo</p>
+                    <p id="next-id-label" class="text-5xl font-black font-mono">#---</p>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-10" id="totalsGrid"></div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <!-- FORMULARIO -->
+            <aside class="lg:col-span-4">
+                <div class="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-200 sticky top-8">
+                    <form id="entryForm" class="space-y-6">
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Línea de Proceso</label>
+                            <select id="linea" class="w-full p-4 bg-slate-50 border-0 rounded-2xl font-bold mt-2 text-slate-700 outline-none">
+                                <option>LPL01</option><option>LPL02</option><option>LFI01</option><option>LFI02</option><option>LPC02</option><option>SILOS</option>
+                            </select>
+                        </div>
+                        <div class="p-6 bg-indigo-50/50 rounded-[2rem] border border-indigo-100/50 space-y-4">
+                            <p class="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Pesos Tandas (KG)</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <select id="t1_name" class="p-3 rounded-xl font-bold text-xs"><option>A1</option><option>A2</option><option>A3</option><option>B1</option><option>B2</option><option>B3</option><option>C1</option><option>C2</option><option>C3</option></select>
+                                <input type="number" id="t1_val" step="0.01" class="p-3 rounded-xl font-bold text-xs" placeholder="Peso 1">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <select id="t2_name" class="p-3 rounded-xl font-bold text-xs"><option>A1</option><option>A2</option><option>A3</option><option selected>B1</option><option>B2</option><option>B3</option><option>C1</option><option>C2</option><option>C3</option></select>
+                                <input type="number" id="t2_val" step="0.01" class="p-3 rounded-xl font-bold text-xs" placeholder="Peso 2">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <select id="t3_name" class="p-3 rounded-xl font-bold text-xs"><option>A1</option><option>A2</option><option>A3</option><option>B1</option><option>B2</option><option>B3</option><option selected>C1</option><option>C2</option><option>C3</option></select>
+                                <input type="number" id="t3_val" step="0.01" class="p-3 rounded-xl font-bold text-xs" placeholder="Peso 3">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Categoría de Material</label>
+                            <select id="tipo" class="w-full p-4 bg-slate-50 border-0 rounded-2xl font-bold mt-2 outline-none">
+                                <option>ESP</option><option>DESPERDICIO</option><option>MASA</option><option>HARINA CONTAMINADA</option><option>REPROCESO ESP</option><option>REPROCESO CÓDITO</option><option>REPROCESO DE FIDEO</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-slate-900 text-white py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-indigo-600 transition-all shadow-xl">Generar Registro</button>
+                    </form>
+                </div>
+            </aside>
+
+            <!-- TABLA PRINCIPAL -->
+            <main class="lg:col-span-8">
+                <div class="bg-white rounded-[3rem] shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="p-6 bg-slate-50 flex justify-between items-center border-b border-slate-100">
+                        <div class="flex gap-3">
+                            <input type="date" id="searchDate" class="p-3 rounded-xl bg-white border border-slate-200 text-xs font-bold">
+                            <input type="text" id="searchBox" placeholder="Buscar..." class="p-3 rounded-xl bg-white border border-slate-200 text-xs font-bold w-72">
+                        </div>
+                        <span id="recordCount" class="text-[10px] font-black bg-slate-200 text-slate-600 px-4 py-2 rounded-full uppercase">0 Registros</span>
+                    </div>
+                    <div class="max-h-[600px] overflow-y-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50/80 sticky top-0 border-b border-slate-200">
+                                <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                    <th class="px-8 py-5">ID</th><th class="px-8 py-5">Hora</th><th class="px-8 py-5">Línea</th><th class="px-8 py-5">Material</th><th class="px-8 py-5 text-right">Total</th><th class="px-8 py-5 text-center">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- MODAL TICKET -->
+    <div id="modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-50 hidden flex items-center justify-center p-6 no-print">
+        <div class="bg-white p-10 rounded-[4rem] max-w-6xl w-full shadow-2xl border-2 border-black">
+            <div class="flex justify-between items-center mb-8">
+                <div class="text-[10px] font-black bg-black text-white px-5 py-2 rounded-full tracking-widest uppercase">Documento de Planta</div>
+                <button onclick="window.closeModal()" class="text-4xl text-slate-300 hover:text-black transition-colors">&times;</button>
+            </div>
+
+            <div id="ticket-capture" class="ticket-bocel mx-auto">
+                <!-- Contenido del ticket -->
+                <div class="header-grid">
+                    <img src="IMG_4612.PNG" alt="Logo BOCEL" class="h-16 w-auto object-contain" onerror="this.src='https://placehold.co/80x80?text=BOCEL'">
+                    <div class="header-center">
+                        <h2>Trazabilidad de Planta</h2>
+                        <p>Control de Pesaje Industrial</p>
+                    </div>
+                    <div class="header-right">
+                        <span>Registro</span>
+                        <p id="v-id">#000</p>
+                    </div>
+                </div>
+                <div class="info-bar">
+                    <div>LÍNEA: <span id="v-linea">--</span></div>
+                    <div>FECHA: <span id="v-fecha">--</span> | <span id="v-hora">--</span></div>
+                </div>
+                <div class="content-grid">
+                    <div class="col-left">
+                        <div class="tandas-section">
+                            <p>Desglose de Pesaje (KG)</p>
+                            <div class="tandas-flex">
+                                <div class="tanda-item"><span id="v-t1-n">TANDA --</span><span id="v-t1-v">0.00</span></div>
+                                <div class="tanda-item"><span id="v-t2-n">TANDA --</span><span id="v-t2-v">0.00</span></div>
+                                <div class="tanda-item"><span id="v-t3-n">TANDA --</span><span id="v-t3-v">0.00</span></div>
+                            </div>
+                        </div>
+                        <div id="v-material" class="category-text">--</div>
+                    </div>
+                    <div class="col-center">
+                        <span class="total-label">Total Paletizado</span>
+                        <div class="total-container"><span id="v-total-val" class="total-val">0.00</span><span class="total-unit">KG</span></div>
+                    </div>
+                    <div class="col-right">
+                        <div id="qrcode"></div>
+                        <p class="qr-label">ACCESO DIGITAL<br>VALIDACIÓN</p>
+                    </div>
+                </div>
+                <div class="footer-line">
+                    <span>Software de Gestión R7 Industrial</span>
+                    <span>Verificado por Planta BOCEL</span>
+                </div>
+            </div>
+
+            <div class="mt-12 flex gap-5 no-print">
+                <button onclick="window.print()" class="flex-1 bg-black text-white py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl hover:scale-[1.01] transition-transform">IMPRIMIR</button>
+                <button onclick="window.downloadImage()" class="flex-1 bg-indigo-600 text-white py-5 rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl hover:scale-[1.01] transition-transform">GUARDAR IMAGEN</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REPORTE GLOBAL ACTUALIZADO -->
+    <div id="report-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[60] hidden flex items-center justify-center p-4 no-print">
+        <div class="report-modal shadow-2xl">
+            <div class="p-8 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <div>
+                    <h2 class="text-2xl font-black uppercase italic tracking-tighter">Reporte General de Pesaje</h2>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Resumen consolidado de todas las tarimas</p>
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="window.print()" class="bg-black text-white px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center gap-2 hover:scale-105 transition-all">
+                        <span>🖨️</span> Imprimir
+                    </button>
+                    <button onclick="window.closeReportModal()" class="bg-slate-200 text-slate-600 w-12 h-12 rounded-xl flex items-center justify-center hover:bg-red-500 hover:text-white transition-all text-2xl font-bold">&times;</button>
+                </div>
+            </div>
+            
+            <div id="report-container" class="flex-1 overflow-y-auto p-10 bg-white">
+                <div class="grid grid-cols-3 gap-6 mb-10">
+                    <div class="bg-slate-50 p-6 rounded-3xl border border-slate-100">
+                        <p class="text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Total Registros</p>
+                        <p id="rep-count" class="text-4xl font-black">0</p>
+                    </div>
+                    <div class="bg-indigo-50 p-6 rounded-3xl border border-indigo-100">
+                        <p class="text-[10px] font-black text-indigo-400 uppercase mb-1 tracking-widest">Peso Bruto Total</p>
+                        <p id="rep-weight" class="text-4xl font-black text-indigo-600">0.00 <span class="text-sm">KG</span></p>
+                    </div>
+                    <div class="bg-slate-900 p-6 rounded-3xl text-white">
+                        <p class="text-[10px] font-black text-slate-500 uppercase mb-1 tracking-widest">Fecha Reporte</p>
+                        <p class="text-xl font-black uppercase" id="rep-date">--</p>
+                    </div>
+                </div>
+
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b-2 border-slate-900 pb-4">
+                            <th class="py-4 px-2">ID</th>
+                            <th class="py-4">Fecha/Hora</th>
+                            <th class="py-4">Línea</th>
+                            <th class="py-4">Categoría</th>
+                            <th class="py-4 text-right">Peso (KG)</th>
+                            <th class="py-4 text-center no-print">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="printable-area" class="print-only"></div>
+    <div id="report-printable" class="print-only"></div>
+
+    <script type="module">
+        import { supabase } from './supabase.js';
+
+        // Variables globales
+        let db = [];
+        const categories = ['ESP', 'DESPERDICIO', 'MASA', 'HARINA CONTAMINADA', 'REPROCESO ESP', 'REPROCESO CÓDITO', 'REPROCESO DE FIDEO'];
+        
+        // Elementos del DOM
+        const form = document.getElementById('entryForm');
+        const searchBox = document.getElementById('searchBox');
+        const searchDate = document.getElementById('searchDate');
+        const tableBody = document.getElementById('tableBody');
+        const totalsGrid = document.getElementById('totalsGrid');
+        const statusBar = document.getElementById('status-bar');
+
+        // Configuración inicial
+        searchDate.valueAsDate = new Date();
+
+        function showStatus(msg, type = 'default') {
+            statusBar.innerText = msg;
+            statusBar.style.display = 'block';
+            statusBar.className = type === 'error' ? 'error' : (type === 'success' ? 'success' : '');
+            setTimeout(() => { statusBar.style.display = 'none'; }, 3000);
+        }
+
+        // ==========================================
+        // FUNCIONES SUPABASE (Cargar/Insertar/Borrar)
+        // ==========================================
+        async function cargarRegistros() {
+            try {
+                // Obtenemos los últimos 50 registros por ID descendente
+                let { data, error } = await supabase
+                    .from('registros')
+                    .select('*')
+                    .order('id', { ascending: false })
+                    .limit(50);
+                
+                if (error) throw error;
+                
+                db = data || [];
+                render();
+            } catch (err) {
+                console.error('Error cargando registros:', err.message);
+                showStatus('Error de conexión con la base de datos', 'error');
+            }
+        }
+
+        async function insertarRegistro(payload) {
+            try {
+                showStatus('Guardando...');
+                const { data, error } = await supabase
+                    .from('registros')
+                    .insert([payload])
+                    .select();
+
+                if (error) throw error;
+
+                showStatus('Registro guardado correctamente', 'success');
+                // Realtime actualizará la lista, pero también podemos actualizar localmente si queremos
+                // Aunque para el modal necesitamos el ID generado
+                if (data && data[0]) {
+                    // Abrimos el modal con el registro recién creado (incluyendo el ID nuevo)
+                    window.openModal(data[0]);
+                }
+            } catch (err) {
+                console.error('Error insertando:', err.message);
+                showStatus('Error al guardar registro: ' + err.message, 'error');
+            }
+        }
+
+        async function eliminarRegistro(id) {
+            if(!confirm(`¿Desea eliminar la tarima #${String(id).padStart(3, '0')} definitivamente?`)) return;
+
+            try {
+                const { error } = await supabase
+                    .from('registros')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+                showStatus('Registro eliminado', 'success');
+            } catch (err) {
+                console.error('Error eliminando:', err.message);
+                showStatus('No se pudo eliminar', 'error');
+            }
+        }
+
+        // ==========================================
+        // REALTIME SUBSCRIPTION
+        // ==========================================
+        supabase.channel('realtime-registros')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'registros' }, () => {
+                console.log('Cambio detectado en la DB, recargando...');
+                cargarRegistros();
+            })
+            .subscribe();
+
+
+        // ==========================================
+        // LÓGICA DE INTERFAZ (Render/Eventos)
+        // ==========================================
+        function render() {
+            const date = searchDate.value; // Formato YYYY-MM-DD
+            const term = searchBox.value.toLowerCase();
+            
+            // Filtramos en memoria lo que hemos traído de la base de datos
+            const filtered = db.filter(r => (r.fecha === date) && (r.linea.toLowerCase().includes(term) || r.tipo.toLowerCase().includes(term) || String(r.id).includes(term)));
+
+            const stats = {};
+            categories.forEach(c => stats[c] = 0);
+            filtered.forEach(r => stats[r.tipo] += parseFloat(r.total));
+
+            // Render Totales
+            totalsGrid.innerHTML = '';
+            categories.forEach(c => {
+                const div = document.createElement('div');
+                div.className = "bg-white p-5 rounded-3xl border border-slate-100 shadow-sm";
+                div.innerHTML = `<p class="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-tighter">${c}</p><p class="text-xl font-black text-slate-800">${stats[c].toFixed(2)}<span class="text-[10px] opacity-30 ml-1">kg</span></p>`;
+                totalsGrid.appendChild(div);
+            });
+
+            // Render Tabla
+            tableBody.innerHTML = '';
+            filtered.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 transition-all";
+                tr.innerHTML = `
+                    <td class="px-8 py-5 font-black text-indigo-600 font-mono text-lg">#${String(r.id).padStart(3, '0')}</td>
+                    <td class="px-8 py-5 text-[11px] font-bold text-slate-400 font-mono">${r.hora}</td>
+                    <td class="px-8 py-5 text-xs font-black uppercase text-slate-700">${r.linea}</td>
+                    <td class="px-8 py-5"><span class="text-[10px] font-black border border-slate-200 px-3 py-1.5 rounded-full uppercase text-slate-500">${r.tipo}</span></td>
+                    <td class="px-8 py-5 text-right font-black text-xl text-slate-900">${r.total} kg</td>
+                    <td class="px-8 py-5 text-center flex justify-center gap-3">
+                        <button onclick='window.viewRecord(${r.id})' class="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center hover:bg-slate-900 hover:text-white transition-all">👁️</button>
+                        <button onclick='window.deleteRecord(${r.id})' class="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center hover:bg-red-600 hover:text-white text-red-400 transition-all">🗑️</button>
+                    </td>
+                `;
+                tableBody.appendChild(tr);
+            });
+
+            const lastId = db.length > 0 ? db[0].id : 0; // Asumiendo que el primero es el mayor porque ordenamos DESC
+            document.getElementById('next-id-label').innerText = `#${String(lastId + 1).padStart(3, '0')}`;
+            document.getElementById('recordCount').innerText = `${filtered.length} REGISTROS (VISTA)`;
+        }
+
+        // Event Listeners
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            const t1v = parseFloat(document.getElementById('t1_val').value || 0);
+            const t2v = parseFloat(document.getElementById('t2_val').value || 0);
+            const t3v = parseFloat(document.getElementById('t3_val').value || 0);
+            const total = (t1v + t2v + t3v).toFixed(2);
+            const now = new Date();
+            
+            const payload = {
+                // NO enviamos ID, dejamos que Supabase lo genere
+                linea: document.getElementById('linea').value,
+                t1_n: document.getElementById('t1_name').value, t1_v: t1v, // Numeric
+                t2_n: document.getElementById('t2_name').value, t2_v: t2v,
+                t3_n: document.getElementById('t3_name').value, t3_v: t3v,
+                total: parseFloat(total), 
+                tipo: document.getElementById('tipo').value,
+                fecha: now.toISOString().split('T')[0], // YYYY-MM-DD
+                hora: now.toLocaleTimeString('es-ES', { hour12: false }) // HH:MM:SS
+            };
+            
+            insertarRegistro(payload);
+            form.reset();
+        };
+
+        searchBox.addEventListener('input', render);
+        searchDate.addEventListener('change', render);
+
+        // ==========================================
+        // EXPORTAR FUNCIONES AL SCOPE GLOBAL (WINDOW)
+        // ==========================================
+        // Necesario para que onclick="window.funcion()" funcione desde el HTML
+
+        window.deleteRecord = eliminarRegistro;
+        window.viewRecord = (id) => { const f = db.find(x => x.id === id); if(f) window.openModal(f); };
+        
+        window.openModal = (r) => {
+            document.getElementById('v-id').innerText = `#${String(r.id).padStart(3, '0')}`;
+            document.getElementById('v-linea').innerText = r.linea;
+            document.getElementById('v-fecha').innerText = r.fecha;
+            document.getElementById('v-hora').innerText = r.hora;
+            document.getElementById('v-material').innerText = r.tipo;
+            document.getElementById('v-total-val').innerText = r.total;
+            document.getElementById('v-t1-n').innerText = `TANDA ${r.t1_n}`;
+            document.getElementById('v-t1-v').innerText = `${r.t1_v}`;
+            document.getElementById('v-t2-n').innerText = `TANDA ${r.t2_n}`;
+            document.getElementById('v-t2-v').innerText = `${r.t2_v}`;
+            document.getElementById('v-t3-n').innerText = `TANDA ${r.t3_n}`;
+            document.getElementById('v-t3-v').innerText = `${r.t3_v}`;
+
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+            const tandas = `${r.t1_n}:${r.t1_v},${r.t2_n}:${r.t2_v},${r.t3_n}:${r.t3_v}`;
+            // Encoding seguro para URL
+            const encoded = btoa(unescape(encodeURIComponent(`${r.id}|${r.linea}|${r.total}|${r.fecha}|${r.hora}|${r.tipo}|${tandas}`)));
+            
+            new QRCode(qrContainer, { 
+                text: `${window.location.origin}${window.location.pathname}?s=${encoded}`, 
+                width: 130, height: 130, colorDark: "#000000" 
+            });
+
+            setTimeout(() => {
+                const printable = document.getElementById('printable-area');
+                printable.innerHTML = '';
+                printable.appendChild(document.getElementById('ticket-capture').cloneNode(true));
+            }, 600);
+            document.getElementById('modal').classList.remove('hidden');
+        };
+
+        window.closeModal = () => { document.getElementById('modal').classList.add('hidden'); };
+        
+        window.openReportModal = () => {
+            const container = document.getElementById('reportTableBody');
+            const totalWeightLabel = document.getElementById('rep-weight');
+            const totalCountLabel = document.getElementById('rep-count');
+            const reportDateLabel = document.getElementById('rep-date');
+            
+            container.innerHTML = '';
+            let totalWeight = 0;
+            
+            db.forEach(r => {
+                totalWeight += parseFloat(r.total);
+                const tr = document.createElement('tr');
+                tr.className = "text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="py-4 px-2 font-mono text-indigo-600">#${String(r.id).padStart(3, '0')}</td>
+                    <td class="py-4 text-slate-400 font-mono">${r.fecha} <span class="ml-1 opacity-50">${r.hora}</span></td>
+                    <td class="py-4 uppercase tracking-tighter">${r.linea}</td>
+                    <td class="py-4"><span class="bg-slate-100 px-2 py-1 rounded text-[10px] uppercase">${r.tipo}</span></td>
+                    <td class="py-4 text-right font-black text-slate-900">${r.total} KG</td>
+                    <td class="py-4 text-center no-print">
+                        <button onclick="window.deleteRecord(${r.id})" class="text-red-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-all">
+                            🗑️
+                        </button>
+                    </td>
+                `;
+                container.appendChild(tr);
+            });
+
+            totalWeightLabel.innerHTML = `${totalWeight.toFixed(2)} <span class="text-sm">KG</span>`;
+            totalCountLabel.innerText = db.length;
+            reportDateLabel.innerText = new Date().toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+            const printContent = document.getElementById('report-container').cloneNode(true);
+            const reportPrintable = document.getElementById('report-printable');
+            reportPrintable.innerHTML = `<h1 style="font-size: 24px; font-weight: 900; margin-bottom: 20px; text-transform: uppercase;">Reporte Global de Producción BOCEL</h1>`;
+            reportPrintable.appendChild(printContent);
+
+            document.getElementById('report-modal').classList.remove('hidden');
+        };
+
+        window.closeReportModal = () => { document.getElementById('report-modal').classList.add('hidden'); };
+        
+        window.downloadImage = async () => {
+            const canvas = await html2canvas(document.getElementById('ticket-capture'), { scale: 3, useCORS: true });
+            const link = document.createElement('a');
+            link.download = `Registro_BOCEL_${document.getElementById('v-id').innerText}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        };
+
+        window.clearScanView = () => {
+            document.getElementById('mobile-view').style.display = 'none';
+            document.getElementById('main-content').style.display = 'block';
+            window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
+        };
+
+        // Lógica de Escaneo QR (se ejecuta al inicio)
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('s')) {
+            try {
+                const d = decodeURIComponent(escape(atob(params.get('s')))).split('|');
+                document.getElementById('main-content').style.display = 'none';
+                document.getElementById('mobile-view').style.display = 'flex';
+                document.getElementById('m-id').innerText = String(d[0]).padStart(3, '0');
+                document.getElementById('m-datetime').innerText = `REGISTRADO EL ${d[3]} A LAS ${d[4]}`;
+                document.getElementById('m-total').innerText = d[2] + " KG";
+                document.getElementById('m-material').innerText = d[5];
+                document.getElementById('m-linea-view').innerText = `LÍNEA: ${d[1]}`;
+                const list = document.getElementById('m-tandas-list');
+                list.innerHTML = '';
+                d[6].split(',').forEach(t => {
+                    const [n, v] = t.split(':');
+                    list.innerHTML += `<div class="flex justify-between items-center py-4 border-b border-slate-700/50 last:border-0"><span class="font-bold text-xs text-slate-400 uppercase tracking-widest">Tanda ${n}</span><span class="font-black text-lg text-white font-mono">${v} KG</span></div>`;
+                });
+            } catch(e) { window.clearScanView(); }
+        }
+
+        // Carga inicial
+        cargarRegistros();
+    </script>
+</body>
+</html>
